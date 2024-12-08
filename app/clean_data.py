@@ -4,7 +4,6 @@ import numpy as np
 
 app = Flask(__name__)
 
-
 # Define the path to your dataset
 path = 'C:\\Users\\Ev\\Desktop\\Week 1 IMDB Analysis\\Week 1 IMDb movies.csv'  # Update with your dataset path
 
@@ -15,7 +14,11 @@ df = pd.read_csv(path)
 df.columns = df.columns.str.strip()
 
 # Columns to drop before starting the API
-columns_to_drop = ["actors", "date_published", "description", "director", "worlwide_gross_income", "imdb_title_id", "metascore", "original_title", "production_company", "title", "usa_gross_income", "writer"]
+columns_to_drop = [
+    "actors", "language", "country", "date_published", "description", "director", 
+    "worlwide_gross_income", "imdb_title_id", "metascore", "original_title", 
+    "production_company", "title", "usa_gross_income", "writer"
+]
 
 # Drop the specified columns before starting the Flask API
 df.drop(columns=columns_to_drop, inplace=True, errors='ignore')
@@ -42,8 +45,25 @@ def clean_data(df):
 
     return df
 
+# One-hot encoding function
+def one_hot_encode_genres(df):
+    # Ensure 'genre' column is present
+    if 'genre' in df.columns:
+        # Split multi-genre entries into separate columns
+        genres_expanded = df['genre'].str.get_dummies(sep=',')
+        print(f"One-hot encoded genres:\n{genres_expanded.head()}")
+        
+        # Combine one-hot encoded genres with the original DataFrame
+        df = pd.concat([df, genres_expanded], axis=1)
+        df.drop(columns=['genre'], inplace=True)  # Drop the original 'genre' column
+    else:
+        print("The 'genre' column is missing!")
+    
+    return df
+
 # Clean the data before serving it
 df = clean_data(df)
+df = one_hot_encode_genres(df)
 
 @app.route('/')
 def home():
