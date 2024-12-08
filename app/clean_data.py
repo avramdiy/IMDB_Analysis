@@ -1,8 +1,10 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_file
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import os
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=os.path.join(os.getcwd(), 'templates'), static_folder=os.path.join(os.getcwd(), 'static'))
 
 # Define the path to your dataset
 path = 'C:\\Users\\Ev\\Desktop\\Week 1 IMDB Analysis\\Week 1 IMDb movies.csv'  # Update with your dataset path
@@ -65,9 +67,59 @@ def one_hot_encode_genres(df):
 df = clean_data(df)
 df = one_hot_encode_genres(df)
 
+# Function to generate the bar chart
+def create_genre_ratings_chart(df):
+    # Identify the one-hot encoded genre columns (numeric columns except 'avg_vote')
+    genre_columns = df.select_dtypes(include=[np.number]).columns.drop('avg_vote')
+
+    # Calculate the weighted average IMDb rating for each genre
+    average_ratings_by_genre = {
+        genre: (df[genre] * df['avg_vote']).sum() / df[genre].sum()
+        for genre in genre_columns
+    }
+
+    # Convert to a pandas Series and sort
+    average_ratings_series = pd.Series(average_ratings_by_genre).sort_values(ascending=False)
+
+    # Generate the bar chart
+    plt.figure(figsize=(12, 6))
+    average_ratings_series.plot(kind='bar', color='skyblue', edgecolor='black')
+    plt.title('Average IMDb Ratings by Genre', fontsize=16)
+    plt.xlabel('Genres', fontsize=14)
+    plt.ylabel('Average IMDb Rating', fontsize=14)
+    plt.xticks(rotation=45, ha='right')
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+
+    # Ensure the static directory exists
+    static_dir = 'static'
+    if not os.path.exists(static_dir):
+        os.makedirs(static_dir)
+
+    # Save the chart to the static directory
+    chart_path = os.path.join(static_dir, 'AverageIMDbRatingsByGenre.png')
+    plt.savefig(chart_path)
+    plt.close()
+    return chart_path
+
+
+# Create the chart when the server starts
+chart_path = create_genre_ratings_chart(df)
+
+from flask import Flask, jsonify, render_template, url_for
+
 @app.route('/')
 def home():
-    return "Welcome to the IMDb Dataset API!"
+    # Generate the URL for the static image
+    chart_url = url_for('static', filename='AverageIMDbRatingsByGenre.png')
+    
+    # Render the template and pass the image URL
+    return render_template('home.html', chart_url=chart_url)
+
+
+@app.route('/chart')
+def chart():
+    return send_file(chart_path, mimetype='image/png')
 
 # Endpoint to get the entire dataset
 @app.route('/data', methods=['GET'])
@@ -82,7 +134,7 @@ def get_sample_data():
     return jsonify(sample_data)
 
 if __name__ == '__main__':
-    # You can save the cleaned dataset if needed
+    # Save the cleaned dataset if needed
     cleaned_file_path = 'cleaned_data.csv'
     df.to_csv(cleaned_file_path, index=False)
 
